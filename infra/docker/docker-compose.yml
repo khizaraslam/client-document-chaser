@@ -1,0 +1,138 @@
+name: client-document-chaser
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cdc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-cdc_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-cdc_dev_password}
+      POSTGRES_DB: ${DB_NAME:-client_doc_chaser}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-cdc_user} -d ${DB_NAME:-client_doc_chaser}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: cdc-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: docker.io/pgsty/silo:RELEASE.2026-11-12T00-00-00Z
+    container_name: cdc-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin_dev_password}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: docker.io/pgsty/mc:RELEASE.2026-11-12T00-00-00Z
+    container_name: cdc-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-minioadmin_dev_password}
+      S3_BUCKET: ${S3_BUCKET:-client-docs-private}
+    entrypoint: ["/bin/sh", "/init-bucket.sh"]
+    volumes:
+      - ./minio/init-bucket.sh:/init-bucket.sh:ro
+
+  clamav:
+    image: clamav/clamav:stable
+    container_name: cdc-clamav
+    profiles: ["security"]
+    restart: unless-stopped
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    container_name: cdc-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      API_PORT: 3001
+      DATABASE_URL: postgresql://${DB_USERNAME:-cdc_user}:${DB_PASSWORD:-cdc_dev_password}@postgres:5432/${DB_NAME:-client_doc_chaser}
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: ${S3_BUCKET:-client-docs-private}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-minioadmin_dev_password}
+      S3_FORCE_PATH_STYLE: "true"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-replace-with-32-char-secret}
+      CORS_ORIGINS: http://localhost:3000
+      APP_URL: http://localhost:3000
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Client Document Chaser <notifications@example.com>}
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:3001
+    container_name: cdc-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+      API_INTERNAL_URL: http://api:3001
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  clamav_data:

@@ -1,0 +1,17 @@
+{
+  "name": "@cdc/config",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.nestjs.json",
+    "tsconfig.nextjs.json",
+    "eslint.base.mjs"
+  ],
+  "scripts": {
+    "build": "echo \"@cdc/config ready\"",
+    "lint": "echo \"@cdc/config lint clean\"",
+    "typecheck": "echo \"@cdc/config typecheck clean\"",
+    "test": "echo \"@cdc/config no runtime tests\""
+  }
+}

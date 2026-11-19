@@ -1,0 +1,6 @@
+{
+  "name": "Client Document Chaser",
+  "description": "Multi-tenant SaaS platform for accounting firms and bookkeepers to request, collect, review, and automate client financial document workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

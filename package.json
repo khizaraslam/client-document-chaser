@@ -1,0 +1,17 @@
+
+{
+  "name": "client-document-chaser",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.28.12",
+  "scripts": {
+    "dev": "pnpm --filter @cdc/web dev",
+    "dev:api": "pnpm --filter @cdc/api dev",
+    "build": "pnpm -r --workspace-concurrency=1 build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "migration:run": "pnpm --filter @cdc/api migration:run",
+    "seed": "pnpm --filter @cdc/api seed"
+  }
+}

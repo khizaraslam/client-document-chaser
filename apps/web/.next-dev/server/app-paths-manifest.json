@@ -1,0 +1,8 @@
+{
+  "/portal/[token]/page": "app/portal/[token]/page.js",
+  "/login/page": "app/login/page.js",
+  "/signup/page": "app/signup/page.js",
+  "/verify-email/page": "app/verify-email/page.js",
+  "/app/page": "app/app/page.js",
+  "/app/templates/page": "app/app/templates/page.js"
+}
